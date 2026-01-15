@@ -1,0 +1,12 @@
+# Nixpacks configuration for Frontend Service
+[phases.setup]
+nixPkgs = ["nodejs-22_12_x"]
+
+[phases.install]
+cmds = ["npm install"]
+
+[phases.build]
+cmds = ["npm run build"]
+
+[start]
+cmd = "npm start"

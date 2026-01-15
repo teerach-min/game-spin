@@ -1,11 +1,11 @@
 # Nixpacks configuration for Railway
 [phases.setup]
-nixPkgs = ["nodejs-18_x", "postgresql"]
+nixPkgs = ["nodejs-22_12_x", "postgresql"]
 
 [phases.install]
 cmds = [
-  "cd back-end && npm ci",
-  "cd front-end && npm ci"
+  "cd back-end && npm install",
+  "cd front-end && npm install"
 ]
 
 [phases.build]
