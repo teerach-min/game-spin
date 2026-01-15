@@ -1,0 +1,76 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/core/prisma/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  point     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relation กับ RewardHistory
+  rewardHistories       RewardHistory[]
+  // Relation กับ RedeemRewardHistory
+  redeemRewardHistories RedeemRewardHistory[]
+
+  @@map("users")
+}
+
+model Reward {
+  id        String   @id @default(uuid())
+  name      String
+  point     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relation กับ RedeemRewardHistory
+  redeemRewardHistories RedeemRewardHistory[]
+
+  @@map("rewards")
+}
+
+model RewardHistory {
+  id          String   @id @default(uuid())
+  rewardPoint String
+  userId      String // FK to User
+  createdAt   DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("reward_histories")
+}
+
+model GameSpin {
+  id        String   @id @default(uuid())
+  point     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("game_spins")
+}
+
+model RedeemRewardHistory {
+  id        String   @id @default(uuid())
+  userId    String // FK to User
+  rewardId  String // FK to Reward
+  createdAt DateTime @default(now())
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reward Reward @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([rewardId])
+  @@map("redeem_reward_histories")
+}
