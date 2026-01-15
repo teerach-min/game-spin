@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 export async function seedRewardHistory(prisma: PrismaClient) {
+  const limitData = 10000;
   console.log('Seeding users and reward history from CSV...');
 
   // Delete all existing data first
@@ -29,7 +30,10 @@ export async function seedRewardHistory(prisma: PrismaClient) {
     datetime: string;
   }> = [];
 
-  for (const line of dataLines) {
+  // limit datalines to 1000
+  const limitedDataLines = dataLines.slice(0, limitData);
+
+  for (const line of limitedDataLines) {
     const [nickname, pointStr, datetime] = line.split(',');
 
     if (!nickname || !pointStr) {
@@ -91,46 +95,101 @@ export async function seedRewardHistory(prisma: PrismaClient) {
     userIdMap.set(user.name, user.id);
   });
 
-  // Step 4: Create reward history records
-  console.log('Creating reward history records...');
+  // Step 4: Create reward history records using bulk insert with transaction
+  console.log('Creating reward history records using bulk insert...');
   let historyCreated = 0;
   let historySkipped = 0;
 
-  for (let i = 0; i < historyRecords.length; i += batchSize) {
-    const batch = historyRecords.slice(i, i + batchSize);
-    const historyData = [];
+  // Prepare all history data first
+  const allHistoryData: Array<{
+    userId: string;
+    rewardPoint: string;
+    createdAt: Date;
+  }> = [];
 
-    for (const record of batch) {
-      const userId = userIdMap.get(record.nickname);
-      if (!userId) {
-        historySkipped++;
-        continue;
-      }
-
-      // Parse datetime - handle format: "2025-06-19 01:00:12.367 +0700"
-      const createdAt = new Date(record.datetime);
-
-      historyData.push({
-        userId,
-        rewardPoint: record.point.toString(),
-        createdAt,
-      });
+  for (const record of historyRecords) {
+    const userId = userIdMap.get(record.nickname);
+    if (!userId) {
+      historySkipped++;
+      continue;
     }
 
-    if (historyData.length > 0) {
-      await prisma.rewardHistory.createMany({
-        data: historyData,
-        skipDuplicates: true,
-      });
-      historyCreated += historyData.length;
+    // Parse datetime - handle format: "2025-06-19 01:00:12.367 +0700"
+    let createdAt: Date;
+    try {
+      createdAt = new Date(record.datetime);
+      if (isNaN(createdAt.getTime())) {
+        createdAt = new Date();
+      }
+    } catch {
+      createdAt = new Date();
+    }
+
+    allHistoryData.push({
+      userId,
+      rewardPoint: record.point.toString(),
+      createdAt,
+    });
+  }
+
+  // Use transaction with multiple createMany calls for better performance
+  const bulkBatchSize = 10000; // Larger batch for bulk insert
+
+  for (let i = 0; i < allHistoryData.length; i += bulkBatchSize) {
+    const batch = allHistoryData.slice(i, i + bulkBatchSize);
+
+    try {
+      // Use transaction to batch multiple createMany operations
+      await prisma.$transaction(
+        async (tx) => {
+          // Split into smaller chunks within transaction to avoid timeout
+          const chunkSize = 2000;
+          for (let j = 0; j < batch.length; j += chunkSize) {
+            const chunk = batch.slice(j, j + chunkSize);
+            await tx.rewardHistory.createMany({
+              data: chunk,
+              skipDuplicates: true,
+            });
+          }
+        },
+        {
+          timeout: 60000, // 60 seconds timeout
+        },
+      );
+      historyCreated += batch.length;
+    } catch (error) {
+      console.error(
+        `Error in bulk insert at batch ${i}:`,
+        error instanceof Error ? error.message : error,
+      );
+      // Fallback to regular createMany if transaction fails
+      try {
+        const fallbackChunkSize = 1000;
+        for (let j = 0; j < batch.length; j += fallbackChunkSize) {
+          const chunk = batch.slice(j, j + fallbackChunkSize);
+          await prisma.rewardHistory.createMany({
+            data: chunk,
+            skipDuplicates: true,
+          });
+          historyCreated += chunk.length;
+        }
+      } catch (fallbackError) {
+        console.error(
+          `Fallback createMany also failed at batch ${i}:`,
+          fallbackError instanceof Error
+            ? fallbackError.message
+            : fallbackError,
+        );
+        historySkipped += batch.length;
+      }
     }
 
     if (
-      (i + batchSize) % 50000 === 0 ||
-      i + batchSize >= historyRecords.length
+      (i + bulkBatchSize) % 50000 === 0 ||
+      i + bulkBatchSize >= allHistoryData.length
     ) {
       console.log(
-        `Processed ${Math.min(i + batchSize, historyRecords.length)}/${historyRecords.length} history records... (${historyCreated} created)`,
+        `Processed ${Math.min(i + bulkBatchSize, allHistoryData.length)}/${allHistoryData.length} history records... (${historyCreated} created, ${historySkipped} skipped)`,
       );
     }
   }

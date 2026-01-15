@@ -21,6 +21,9 @@ export class PrismaUserRepository implements IUserRepository {
   }
 
   async findById(id: string): Promise<UserEntity | null> {
+    if (!id || id.trim() === '') {
+      return null;
+    }
     return this.prisma.user.findUnique({
       where: { id },
     });

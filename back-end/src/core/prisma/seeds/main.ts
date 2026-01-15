@@ -15,9 +15,9 @@ async function main() {
   console.log('Starting seed process...\n');
 
   try {
-    // await seedRewards(prisma);
+    await seedRewards(prisma);
     await seedGameSpins(prisma);
-    // await seedRewardHistory(prisma);
+    await seedRewardHistory(prisma);
     console.log('\n✨ All seeds completed successfully!');
   } catch (error) {
     console.error('Error during seeding:', error);

@@ -1,15 +1,17 @@
 # Nixpacks configuration for Backend Service
 [phases.setup]
-nixPkgs = ["nodejs-22_12_x"]
+nixpkgsArchive = "50165c4f7eb48ce82bd063e1fb8047a0f515f8ce"
+providers = ["node"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["NODE_ENV=development npm ci"]
 
 [phases.build]
 cmds = [
   "npm run prisma:generate",
-  "npm run build"
+  "npm run build",
+  "test -f dist/src/main.js || (echo 'ERROR: dist/src/main.js not found after build' && ls -la dist/ && exit 1)"
 ]
 
 [start]
-cmd = "npm run start:prod"
+cmd = "npm run prisma:migrate:deploy && npm run start:prod"

@@ -1,12 +1,16 @@
 # Nixpacks configuration for Frontend Service
 [phases.setup]
-nixPkgs = ["nodejs-22_12_x"]
+nixpkgsArchive = "50165c4f7eb48ce82bd063e1fb8047a0f515f8ce"
+providers = ["node"]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["NODE_ENV=development npm ci"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = [
+  "echo 'Building with NEXT_PUBLIC_API_BASE_URL=' $NEXT_PUBLIC_API_BASE_URL",
+  "npm run build"
+]
 
 [start]
 cmd = "npm start"
