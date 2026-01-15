@@ -1,0 +1,19 @@
+# Nixpacks configuration for Railway
+[phases.setup]
+nixPkgs = ["nodejs-18_x", "postgresql"]
+
+[phases.install]
+cmds = [
+  "cd back-end && npm ci",
+  "cd front-end && npm ci"
+]
+
+[phases.build]
+cmds = [
+  "cd back-end && npm run prisma:generate",
+  "cd back-end && npm run build",
+  "cd front-end && npm run build"
+]
+
+[start]
+cmd = "cd back-end && npm run start:prod"
